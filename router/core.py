@@ -1,8 +1,4 @@
-"""频道路由：作用域校验、每人冷却、空消息拒绝与消息去重。
-
-缺陷：不校验频道作用域、冷却不生效、空消息放行、未知频道放行、
-每次发送扫描全部频道。
-"""
+"""频道路由：作用域校验、每人冷却、空消息拒绝与消息去重。"""
 
 
 class Router:
@@ -17,9 +13,20 @@ class Router:
         self.channels[channel] = scope
 
     def send(self, player, channel, scope, text, now_ms, msg_id):
-        self.scanned += len(self.channels)
+        self.scanned += 1
+        allowed = self.channels.get(channel)
+        if allowed is None or allowed != scope:
+            return False
+        if not text or not text.strip():
+            return False
+        if msg_id in self.seen:
+            return False
+        key = (player, channel)
+        last_ms = self.last.get(key)
+        if last_ms is not None and now_ms - last_ms < self.cooldown_ms:
+            return False
         self.seen.add(msg_id)
-        self.last[(player, channel)] = now_ms
+        self.last[key] = now_ms
         return True
 
     def scanned_count(self):
